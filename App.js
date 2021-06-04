@@ -88,9 +88,10 @@ const App: () => Node = () => {
   };
 
   const connect = () => {
-    manager.connectToDevice(dev.id).then(d => {
+    manager.connectToDevice(dev.id).then(async d => {
       console.log(d, 'CONNECTED DEV');
       connectedDevice = d;
+
       d.discoverAllServicesAndCharacteristics().then(data => {
         console.log(data, 'DATA');
         data.services().then(services => {
@@ -99,24 +100,18 @@ const App: () => Node = () => {
           //   '71712a7e-bc95-4e65-a522-ea125ba4ac47',
           //   '131f59b3-75da-45bc-baac-bc0a698b6371',
           // ).then(cha => console.log(cha, 'CHA-DATA'));
+
           d.characteristicsForService(
             '71712a7e-bc95-4e65-a522-ea125ba4ac47',
           ).then(ch => {
             console.log(ch, 'CH');
             ch.forEach(c => {
-              if (c.uuid === '131f59b3-75da-45bc-baac-bc0a698b6371') {
+              if (c.uuid === '86f4e91d-07ac-47cc-916b-69c8789635d3') {
                 console.log('UUID', c.uuid);
-                c.monitor((err, chadata) => {
-                  if (err) {
-                    console.log(err, 'ERROR');
-                  }
-                  console.log('READ-1', chadata);
-                });
-
-                c.writeWithResponse(base64.encode('C'))
+                c.writeWithResponse(base64.encode('RD'))
                   .then(res => {
                     console.log('Success', res);
-
+                    // c.read().then(dR => console.log(dR, 'DATA_READ2'));
                     c.monitor((err, chadata) => {
                       if (err) {
                         console.log(err, 'ERROR');
@@ -124,9 +119,37 @@ const App: () => Node = () => {
                       console.log('READ-1', chadata);
                     });
                   })
-
                   .catch(e => console.log('Error', e));
               }
+
+              // d.readCharacteristicForService(
+              //     '71712a7e-bc95-4e65-a522-ea125ba4ac47',
+              //     '131f59b3-75da-45bc-baac-bc0a698b6371',
+              // ).then(dataRead => {
+              //   console.log(dataRead, 'DATA_READ1');
+              //   console.log(dataRead.value, 'VALUE');
+              //
+              //   c.writeWithResponse(base64.encode('C'))
+              //       .then(res => {
+              //         console.log('Success', res);
+              //         c.monitor((err, chadata) => {
+              //           if (err) {
+              //             console.log(err, 'ERROR');
+              //           }
+              //           console.log('READ-1', chadata);
+              //           c.read().then(dR => console.log(dR, 'DATA_READ2'));
+              //         });
+              //       })
+              //       .catch(e => console.log('Error', e));
+              // });
+
+              // c.monitor((err, chadata) => {
+              //   if (err) {
+              //     console.log(err, 'ERROR');
+              //   }
+              //   console.log('READ-1', chadata);
+              // });
+              // }
             });
           });
 
