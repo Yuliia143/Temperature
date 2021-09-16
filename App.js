@@ -1,215 +1,167 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- * @flow strict-local
- */
-
-import React from 'react';
+import React, {useState} from 'react';
 import type {Node} from 'react';
-import binaryToBase64, {
+import {
   Button,
-  FlatList,
+  PermissionsAndroid,
   SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  useColorScheme,
+  TouchableOpacity,
   View,
 } from 'react-native';
-
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
 
 import {BleManager} from 'react-native-ble-plx';
 import base64 from 'react-native-base64';
 
-const Section = ({children, title}): Node => {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-};
+import BluetoothStateManager from 'react-native-bluetooth-state-manager';
 
 const App: () => Node = () => {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
   const manager = new BleManager();
   const devices = [];
   let dev = {};
   let connectedDevice = {};
 
+  async function requestLocationPermission() {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Location permission for bluetooth scanning',
+          message: 'wahtever',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        },
+      );
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        console.log('Location permission for bluetooth scanning granted');
+        return true;
+      } else {
+        console.log('Location permission for bluetooth scanning revoked');
+        return false;
+      }
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  }
+
+  async function requestTurnOnBluetoothPermission() {
+    return await BluetoothStateManager.requestToEnable()
+      .then(() => true)
+      .catch(() => false);
+  }
+
   const scan = () => {
-    console.log('scan');
-    manager.startDeviceScan(null, {allowDuplicates: false}, (error, device) => {
-      if (error) {
-        console.log('error', error);
-        return;
-      }
-      if (device) {
-        devices.push(device);
-      }
-      if (device?.name === 'TMW012BT') {
-        console.log(device);
-        dev = device;
-        manager.stopDeviceScan();
-      }
-    });
+    const permission =
+      requestLocationPermission() && requestTurnOnBluetoothPermission();
+    if (permission) {
+      console.log('scan');
+      manager.startDeviceScan(
+        null,
+        {allowDuplicates: false},
+        (error, device) => {
+          if (error) {
+            console.log('error', error);
+            return;
+          }
+          if (device) {
+            devices.push(device);
+          }
+          if (device?.name === 'TMW012BT') {
+            console.log(device);
+            dev = device;
+            manager.stopDeviceScan();
+          }
+        },
+      );
+    }
   };
 
-  const connect = () => {
-    manager.connectToDevice(dev.id).then(async d => {
-      console.log(d, 'CONNECTED DEV');
-      connectedDevice = d;
+  const [values, setValues] = useState([]);
 
-      d.discoverAllServicesAndCharacteristics().then(data => {
-        console.log(data, 'DATA');
-        data.services().then(services => {
-          console.log(services, 'SERV');
-          // d.readCharacteristicForService(
-          //   '71712a7e-bc95-4e65-a522-ea125ba4ac47',
-          //   '131f59b3-75da-45bc-baac-bc0a698b6371',
-          // ).then(cha => console.log(cha, 'CHA-DATA'));
+  console.log(values, 'VALUES');
 
-          d.characteristicsForService(
-            '71712a7e-bc95-4e65-a522-ea125ba4ac47',
-          ).then(ch => {
-            console.log(ch, 'CH');
-            ch.forEach(c => {
-              if (c.uuid === '86f4e91d-07ac-47cc-916b-69c8789635d3') {
-                console.log('UUID', c.uuid);
-                c.writeWithResponse(base64.encode('RD'))
-                  .then(res => {
-                    console.log('Success', res);
-                    // c.read().then(dR => console.log(dR, 'DATA_READ2'));
-                    c.monitor((err, chadata) => {
-                      if (err) {
-                        console.log(err, 'ERROR');
-                      }
-                      console.log('READ-1', chadata);
-                    });
-                  })
-                  .catch(e => console.log('Error', e));
-              }
+  const connect = async () => {
+    const permission = await requestTurnOnBluetoothPermission();
+    console.log(permission, 'before if');
+    if (permission) {
+      console.log('permission', permission);
+      console.log('connect', dev.id);
+      manager
+        .connectToDevice('00:A0:50:D2:D2:90', {requestMTU: 512})
+        .then(async d => {
+          console.log(d, 'CONNECTED DEV');
+          connectedDevice = d;
+          console.log(connectedDevice);
 
-              // d.readCharacteristicForService(
-              //     '71712a7e-bc95-4e65-a522-ea125ba4ac47',
-              //     '131f59b3-75da-45bc-baac-bc0a698b6371',
-              // ).then(dataRead => {
-              //   console.log(dataRead, 'DATA_READ1');
-              //   console.log(dataRead.value, 'VALUE');
-              //
-              //   c.writeWithResponse(base64.encode('C'))
-              //       .then(res => {
-              //         console.log('Success', res);
-              //         c.monitor((err, chadata) => {
-              //           if (err) {
-              //             console.log(err, 'ERROR');
-              //           }
-              //           console.log('READ-1', chadata);
-              //           c.read().then(dR => console.log(dR, 'DATA_READ2'));
-              //         });
-              //       })
-              //       .catch(e => console.log('Error', e));
-              // });
+          d.discoverAllServicesAndCharacteristics().then(data => {
+            console.log(data, 'DATA');
+            data.services().then(services => {
+              d.characteristicsForService(
+                '71712a7e-bc95-4e65-a522-ea125ba4ac47',
+              ).then(ch => {
+                console.log(ch, 'CH');
+                ch.forEach(c => {
+                  if (c.uuid === '86f4e91d-07ac-47cc-916b-69c8789635d3') {
+                    console.log('UUID', c.uuid);
+                    c.isNotifiable &&
+                      c
+                        .writeWithResponse(base64.encode('RD'))
+                        .then(res => {
+                          console.log('Success', res);
+                          c.monitor((err, chadata) => {
+                            if (err) {
+                              console.log(err, 'ERROR');
+                            }
+                            setValues(prev => [...prev, chadata.value]);
+                            console.log('READ-1', chadata);
+                          });
+                        })
 
-              // c.monitor((err, chadata) => {
-              //   if (err) {
-              //     console.log(err, 'ERROR');
-              //   }
-              //   console.log('READ-1', chadata);
-              // });
-              // }
+                        .catch(e => console.log('Error', e));
+                  }
+                });
+              });
             });
           });
-
-          // d.characteristicsForService(
-          //   '71712a7e-bc95-4e65-a522-ea125ba4ac47',
-          // ).then(ch => {
-          //   console.log(ch, 'CH');
-          //   ch.forEach(c => {
-          //     if (c.uuid === '86f4e91d-07ac-47cc-916b-69c8789635d3') {
-          //       console.log('UUID', c.uuid);
-          //       d.monitorCharacteristicForService(
-          //         '71712a7e-bc95-4e65-a522-ea125ba4ac47',
-          //         c.uuid,
-          //         (err, cr) => {
-          //           console.log('monitor');
-          //           if (err) {
-          //             console.log(err, 'error');
-          //           }
-          //           console.log('Cha', cr);
-          //         },
-          //       );
-          //     }
-          //   });
-          // });
         });
-      });
-    });
+    }
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <View
-        style={{
-          backgroundColor: isDarkMode ? Colors.black : Colors.white,
-        }}>
+    <SafeAreaView>
+      <View>
         <Button title={'Scan'} onPress={scan} />
-        <Button title={'Connect'} onPress={connect} />
+        {/*<Button title={'Connect'} onPress={connect} />*/}
+      </View>
+
+      <TouchableOpacity
+        style={{
+          width: 300,
+          height: 100,
+          marginTop: 20,
+          alignSelf: 'center',
+          backgroundColor: 'pink',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        onPress={connect}>
+        <Text>Id : 00:A0:50:D2:D2:90</Text>
+      </TouchableOpacity>
+
+      <View>
+        {values.map(val => (
+          <Text key={val}>
+            {val} - {base64.decode(val)}
+          </Text>
+        ))}
       </View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+const styles = StyleSheet.create({});
 
 export default App;
